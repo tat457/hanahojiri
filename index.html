@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鼻ほじり衛生ビジュアルシミュレーター | Nose Germ Visualizer</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Plus+Jakarta+Sans:wght@600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Zen Maru Gothic', sans-serif;
+            touch-action: manipulation;
+        }
+        .font-en {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        /* Pulsing bio-hazard glow */
+        @keyframes bio-pulse {
+            0%, 100% { box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.8); }
+        }
+        .bio-glow {
+            animation: bio-pulse 2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col selection:bg-rose-500 selection:text-white">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center text-xl font-black shadow-lg shadow-rose-500/20">
+                    🦠
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight flex items-center gap-2">
+                        鼻ほじり衛生シミュレーター
+                        <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">閲覧注意？</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">指を鼻に入れるとどれだけ汚いのか？を科学的に可視化</p>
+                </div>
+            </div>
+
+            <!-- Sound Toggle Button -->
+            <button id="soundToggleBtn" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 transition">
+                <i data-lucide="volume-2" class="w-4 h-4 text-emerald-400"></i>
+                <span id="soundStatusText">効果音 ON</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content Grid -->
+    <main class="max-w-6xl mx-auto px-4 py-6 flex-1 flex flex-col gap-8 w-full">
+
+        <!-- Simulation Stage -->
+        <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            <!-- Main Canvas Viewport (Left 8 cols) -->
+            <div class="lg:col-span-8 bg-slate-800/80 border border-slate-700/60 rounded-3xl p-4 md:p-6 shadow-2xl relative overflow-hidden flex flex-col gap-4">
+                
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-700/50 pb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="w-3 h-3 rounded-full bg-rose-500 animate-ping"></span>
+                        <h2 class="font-bold text-base md:text-lg">【1】鼻ほじり・ミクロ観察フェーズ</h2>
+                    </div>
+                    <div class="text-xs text-slate-400 bg-slate-900/60 px-3 py-1 rounded-full border border-slate-700">
+                        👆 指をドラッグして鼻の穴に近づけてみよう
+                    </div>
+                </div>
+
+                <!-- Interactive Canvas Box -->
+                <div class="relative w-full aspect-[4/3] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 rounded-2xl overflow-hidden border border-slate-800 cursor-grab active:cursor-grabbing group shadow-inner" id="canvasContainer">
+                    
+                    <canvas id="simCanvas" class="w-full h-full block"></canvas>
+
+                    <!-- Overlay Controls / Hint -->
+                    <div id="dragHint" class="absolute inset-0 pointer-events-none flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] transition-opacity duration-500">
+                        <div class="bg-slate-900/90 border border-rose-500/40 p-4 rounded-2xl text-center shadow-xl max-w-xs transform group-hover:scale-105 transition">
+                            <div class="text-4xl mb-2 animate-bounce">👇</div>
+                            <p class="font-bold text-sm text-rose-300">指をドラッグ／タッチして</p>
+                            <p class="text-xs text-slate-300 mt-1">鼻の穴（ピンク部分）へ挿入してください</p>
+                        </div>
+                    </div>
+
+                    <!-- Live Micro Status Badge -->
+                    <div class="absolute top-3 left-3 bg-slate-900/80 backdrop-blur border border-slate-700 px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 shadow">
+                        <div id="statusDot" class="w-2 h-2 rounded-full bg-emerald-400"></div>
+                        <span id="statusText" class="font-medium">状態: 接触前（待機中）</span>
+                    </div>
+
+                    <!-- Clean Button on Canvas -->
+                    <button id="resetFingerBtn" class="absolute top-3 right-3 bg-slate-900/80 hover:bg-emerald-600 text-white border border-slate-700 px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow active:scale-95">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-300"></i>
+                        <span>指をアルコール消毒</span>
+                    </button>
+                </div>
+
+                <!-- Live Meters & Dynamic Feedback -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="bg-slate-900/60 border border-slate-700/50 p-3 rounded-2xl text-center">
+                        <div class="text-xs text-slate-400 mb-1">指先の雑菌推定数</div>
+                        <div id="fingerGermCount" class="font-en text-xl md:text-2xl font-black text-amber-400">250,000</div>
+                        <div class="text-[10px] text-slate-500">個 / cm²</div>
+                    </div>
+
+                    <div class="bg-slate-900/60 border border-slate-700/50 p-3 rounded-2xl text-center">
+                        <div class="text-xs text-slate-400 mb-1">粘膜の傷つき度</div>
+                        <div id="mucosaDamage" class="font-en text-xl md:text-2xl font-black text-rose-500">0 %</div>
+                        <div class="text-[10px] text-slate-500">粘膜バリア破損率</div>
+                    </div>
+
+                    <div class="bg-slate-900/60 border border-slate-700/50 p-3 rounded-2xl text-center">
+                        <div class="text-xs text-slate-400 mb-1">指への粘液・菌付着</div>
+                        <div id="mucusContamination" class="font-en text-xl md:text-2xl font-black text-emerald-400">0 %</div>
+                        <div class="text-[10px] text-slate-500">交差汚染レベル</div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Controls & Real-time Scientific Explanation Panel -->
+            <div class="lg:col-span-4 flex flex-col gap-4">
+                
+                <!-- Danger Warning Card -->
+                <div class="bg-gradient-to-br from-rose-950/60 to-slate-900 border border-rose-500/30 rounded-3xl p-5 shadow-lg relative overflow-hidden">
+                    <div class="absolute -right-4 -bottom-4 text-6xl opacity-10 font-black">WARNING</div>
+                    <h3 class="font-bold text-rose-400 flex items-center gap-2 mb-2">
+                        <i data-lucide="triangle-alert" class="w-5 h-5"></i>
+                        鼻ほじりが「汚い＆危険」な理由
+                    </h3>
+                    <ul class="text-xs text-slate-300 space-y-2 leading-relaxed">
+                        <li class="flex items-start gap-1.5">
+                            <span class="text-rose-400 font-bold">1.</span>
+                            <span>手にはトイレの便座以上に無数の<b>雑菌・ウイルス</b>（黄色ブドウ球菌等）が付着しています。</span>
+                        </li>
+                        <li class="flex items-start gap-1.5">
+                            <span class="text-rose-400 font-bold">2.</span>
+                            <span>鼻腔内はデリケートな<b>血管の集中地帯（キッセルバッハ部位）</b>。爪で簡単に微細な傷がつきます。</span>
+                        </li>
+                        <li class="flex items-start gap-1.5">
+                            <span class="text-rose-400 font-bold">3.</span>
+                            <span>傷口から雑菌が直接血流へ侵入し、<b>感染症（毛嚢炎・蜂巣炎）</b>を引き起こします。</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Real-time Event Microscope Log -->
+                <div class="bg-slate-800/80 border border-slate-700/60 rounded-3xl p-5 flex-1 flex flex-col gap-3">
+                    <h3 class="font-bold text-sm text-slate-200 flex items-center justify-between">
+                        <span>🔬 顕微鏡リアルタイム観察ログ</span>
+                        <span class="text-[10px] bg-slate-700 px-2 py-0.5 rounded text-slate-300">Live</span>
+                    </h3>
+                    <div id="eventLog" class="bg-slate-950 rounded-xl p-3 h-48 overflow-y-auto text-xs font-mono space-y-2 border border-slate-800 text-slate-400">
+                        <div class="text-emerald-400">> シミュレーター起動完了。</div>
+                        <div>> 指先と鼻孔の雑菌グラフィックを生成しました。</div>
+                        <div>> 指を鼻に近付けると相互汚染が始まります...</div>
+                    </div>
+                </div>
+
+            </div>
+
+        </section>
+
+        <!-- Phase 2: Secondary Contamination Simulation (Spread to environment) -->
+        <section class="bg-slate-800/80 border border-slate-700/60 rounded-3xl p-6 shadow-xl">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-slate-700/60 pb-4">
+                <div>
+                    <h2 class="font-bold text-lg md:text-xl text-amber-400 flex items-center gap-2">
+                        <span>【2】「鼻をほじった後の指」で日常の物を触ると...？</span>
+                    </h2>
+                    <p class="text-xs text-slate-400 mt-1">鼻から指に付着した粘液・黄色ブドウ球菌が、触れた物へと一瞬で二次拡散（感染拡大）します。</p>
+                </div>
+
+                <!-- Contamination Level Badge -->
+                <div class="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-2xl border border-slate-700">
+                    <span class="text-xs text-slate-400">現在の指の汚染状態:</span>
+                    <span id="fingerDirtyBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700">
+                        きれい（未汚染）
+                    </span>
+                </div>
+            </div>
+
+            <!-- Touch Target Interactive Grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                
+                <!-- Target 1: Smartphone -->
+                <button class="target-card group bg-slate-900 border border-slate-700 hover:border-rose-500/50 rounded-2xl p-4 flex flex-col items-center gap-3 transition text-center relative overflow-hidden" data-target="スマホ">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-800 group-hover:bg-rose-500/10 flex items-center justify-center text-2xl transition">
+                        📱
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200">スマートフォン</div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">画面に皮脂と菌が大量付着</div>
+                    </div>
+                    <div class="germ-overlay absolute inset-0 bg-emerald-950/80 backdrop-blur-[1px] flex flex-col items-center justify-center opacity-0 transition pointer-events-none p-2">
+                        <span class="text-rose-400 font-black text-xs">⚠️ 激しくバイオ汚染！</span>
+                        <span class="text-[10px] text-emerald-200 mt-1">画面タッチで顔に菌が再付着</span>
+                    </div>
+                </button>
+
+                <!-- Target 2: Doorknob -->
+                <button class="target-card group bg-slate-900 border border-slate-700 hover:border-rose-500/50 rounded-2xl p-4 flex flex-col items-center gap-3 transition text-center relative overflow-hidden" data-target="ドアノブ">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-800 group-hover:bg-rose-500/10 flex items-center justify-center text-2xl transition">
+                        🚪
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200">ドアノブ</div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">家族や他人に菌が即感染</div>
+                    </div>
+                    <div class="germ-overlay absolute inset-0 bg-emerald-950/80 backdrop-blur-[1px] flex flex-col items-center justify-center opacity-0 transition pointer-events-none p-2">
+                        <span class="text-rose-400 font-black text-xs">⚠️ 家族に家庭内感染！</span>
+                        <span class="text-[10px] text-emerald-200 mt-1">ドアノブは菌の集積地</span>
+                    </div>
+                </button>
+
+                <!-- Target 3: Food / Snack -->
+                <button class="target-card group bg-slate-900 border border-slate-700 hover:border-rose-500/50 rounded-2xl p-4 flex flex-col items-center gap-3 transition text-center relative overflow-hidden" data-target="お菓子・食べ物">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-800 group-hover:bg-rose-500/10 flex items-center justify-center text-2xl transition">
+                        🍕
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200">食べ物・お菓子</div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">菌を直接口へ運ぶリスク</div>
+                    </div>
+                    <div class="germ-overlay absolute inset-0 bg-emerald-950/80 backdrop-blur-[1px] flex flex-col items-center justify-center opacity-0 transition pointer-events-none p-2">
+                        <span class="text-rose-400 font-black text-xs">⚠️ 食中毒・腹痛リスク！</span>
+                        <span class="text-[10px] text-emerald-200 mt-1">黄色ブドウ球菌毒素が体内へ</span>
+                    </div>
+                </button>
+
+                <!-- Target 4: Elevator Button -->
+                <button class="target-card group bg-slate-900 border border-slate-700 hover:border-rose-500/50 rounded-2xl p-4 flex flex-col items-center gap-3 transition text-center relative overflow-hidden" data-target="エレベーターボタン">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-800 group-hover:bg-rose-500/10 flex items-center justify-center text-2xl transition">
+                        🔘
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200">エレベーターボタン</div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">不特定多数へのパンデミック</div>
+                    </div>
+                    <div class="germ-overlay absolute inset-0 bg-emerald-950/80 backdrop-blur-[1px] flex flex-col items-center justify-center opacity-0 transition pointer-events-none p-2">
+                        <span class="text-rose-400 font-black text-xs">⚠️ 市中感染クラスター！</span>
+                        <span class="text-[10px] text-emerald-200 mt-1">公共の場で菌をばら撒く</span>
+                    </div>
+                </button>
+
+                <!-- Target 5: Friend / Handshake -->
+                <button class="target-card group bg-slate-900 border border-slate-700 hover:border-rose-500/50 rounded-2xl p-4 flex flex-col items-center gap-3 transition text-center relative overflow-hidden" data-target="友達の手・顔">
+                    <div class="w-12 h-12 rounded-2xl bg-slate-800 group-hover:bg-rose-500/10 flex items-center justify-center text-2xl transition">
+                        🤝
+                    </div>
+                    <div>
+                        <div class="font-bold text-sm text-slate-200">友達の手・顔</div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">大切な人に菌をダイレクト手渡し</div>
+                    </div>
+                    <div class="germ-overlay absolute inset-0 bg-emerald-950/80 backdrop-blur-[1px] flex flex-col items-center justify-center opacity-0 transition pointer-events-none p-2">
+                        <span class="text-rose-400 font-black text-xs">⚠️ 嫌われる最大要因！</span>
+                        <span class="text-[10px] text-emerald-200 mt-1">衛生観念を疑われます</span>
+                    </div>
+                </button>
+
+            </div>
+        </section>
+
+        <!-- Educational Microbe Cards -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-3xl p-5 flex flex-col gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center text-xl font-bold">🧫</div>
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-100">黄色ブドウ球菌</h3>
+                        <p class="text-[11px] text-slate-400">Staphylococcus aureus</p>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-300 leading-relaxed">
+                    人間の皮膚や鼻腔内に常在する代表的な細菌。普段は皮膚バリアに守られていますが、鼻をほじって粘膜に傷がつくと侵入し、とびひ（伝染性膿疱疹）や激しい膿みを発生させます。
+                </p>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-3xl p-5 flex flex-col gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl font-bold">🩺</div>
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-100">キッセルバッハ部位の危険性</h3>
+                        <p class="text-[11px] text-slate-400">Kiesselbach's area</p>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-300 leading-relaxed">
+                    鼻の穴の入り口近く（鼻中隔の前下部）にある、動脈が集まる非常にデリケートなエリア。爪で少し刺激するだけで容易に出血し、そこが雑菌の直接侵入ルートになります。
+                </p>
+            </div>
+
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-3xl p-5 flex flex-col gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xl font-bold">🧼</div>
+                    <div>
+                        <h3 class="font-bold text-sm text-slate-100">正しい鼻のケア方法</h3>
+                        <p class="text-[11px] text-slate-400">Hygiene Solution</p>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-300 leading-relaxed">
+                    鼻が詰まったり気になる時は、指を突っ込まずに<b>ティッシュで優しくかむ</b>か、<b>生理食塩水（鼻うがい）</b>で洗い流すのが医学的に正しいケアです。どうしても触る時は事前に石鹸手洗いを！
+                </p>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-slate-800 py-6 text-center text-xs text-slate-500 mt-8">
+        <p>鼻ほじり衛生ビジュアルシミュレーター — 衛生意識向上のためのインタラクティブ教材</p>
+    </footer>
+
+    <script>
+        // --- Web Audio API Synthetic Sound Generator ---
+        class SoundFX {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    this.ctx = new AudioContext();
+                }
+            }
+
+            playSquish() {
+                if (!this.enabled) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(120, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.2);
+
+                gain.gain.setValueAtTime(0.3, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            }
+
+            playWarning() {
+                if (!this.enabled) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(440, this.ctx.currentTime);
+                osc.frequency.setValueAtTime(880, this.ctx.currentTime + 0.1);
+
+                gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.25);
+            }
+
+            playClean() {
+                if (!this.enabled) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, this.ctx.currentTime); // C5
+                osc.frequency.exponentialRampToValueAtTime(1046.50, this.ctx.currentTime + 0.3); // C6
+
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.3);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.3);
+            }
+        }
+
+        const audio = new SoundFX();
+
+        // Sound Toggle UI
+        const soundBtn = document.getElementById('soundToggleBtn');
+        const soundText = document.getElementById('soundStatusText');
+        soundBtn.addEventListener('click', () => {
+            audio.enabled = !audio.enabled;
+            if (audio.enabled) {
+                soundText.innerText = '効果音 ON';
+                soundBtn.querySelector('i').classList.replace('text-slate-500', 'text-emerald-400');
+            } else {
+                soundText.innerText = '効果音 OFF';
+                soundBtn.querySelector('i').classList.replace('text-emerald-400', 'text-slate-500');
+            }
+        });
+
+        // --- Interactive Simulation Canvas Setup ---
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const dragHint = document.getElementById('dragHint');
+
+        // Responsive Canvas Scaling
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // State Variables
+        let isDragging = false;
+        let hasTouchedNose = false;
+        let damageVal = 0;
+        let mucusVal = 0;
+        let currentGermCount = 250000;
+
+        // Position State (Normalized 0 ~ 1 for responsive canvas)
+        const fingerPos = { x: 0.5, y: 0.85 };
+        const targetNostril = { x: 0.5, y: 0.32, radius: 45 };
+
+        // Germ Particle Definition
+        class Particle {
+            constructor(owner) {
+                this.owner = owner; // 'finger' or 'nostril' or 'free'
+                this.reset();
+            }
+
+            reset() {
+                this.x = (Math.random() - 0.5) * 40;
+                this.y = (Math.random() - 0.5) * 40;
+                this.size = Math.random() * 3.5 + 2;
+                this.color = this.owner === 'finger' ? '#fbbf24' : '#10b981'; // yellow (staph) vs green (mucus germ)
+                this.vx = (Math.random() - 0.5) * 1.5;
+                this.vy = (Math.random() - 0.5) * 1.5;
+                this.pulse = Math.random() * Math.PI * 2;
+            }
+
+            update(anchorX, anchorY) {
+                this.pulse += 0.08;
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Keep bounded around anchor point
+                const dist = Math.hypot(this.x, this.y);
+                if (dist > 35) {
+                    this.vx *= -0.8;
+                    this.vy *= -0.8;
+                }
+            }
+
+            draw(ctx, anchorX, anchorY) {
+                const drawX = anchorX + this.x;
+                const drawY = anchorY + this.y;
+                const currentSize = this.size + Math.sin(this.pulse) * 0.8;
+
+                ctx.save();
+                ctx.fillStyle = this.color;
+                ctx.beginPath();
+                ctx.arc(drawX, drawY, Math.max(1, currentSize), 0, Math.PI * 2);
+                ctx.fill();
+
+                // Glow effect
+                ctx.shadowColor = this.color;
+                ctx.shadowBlur = 6;
+                ctx.restore();
+            }
+        }
+
+        // Generate Particles for Finger & Nostril
+        const fingerGerms = Array.from({ length: 35 }, () => new Particle('finger'));
+        const nostrilGerms = Array.from({ length: 45 }, () => new Particle('nostril'));
+
+        // Main Animation Loop
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // Nostril Position Real Pixels
+            const noseX = w * targetNostril.x;
+            const noseY = h * targetNostril.y;
+
+            // Finger Position Real Pixels
+            const fx = w * fingerPos.x;
+            const fy = h * fingerPos.y;
+
+            // --- 1. Draw Nose Background Graphics ---
+            // Outer Nose Outline
+            ctx.fillStyle = '#331b28';
+            ctx.beginPath();
+            ctx.ellipse(noseX, noseY - 20, 110, 80, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nostril Hole (Dark Mucosa Area)
+            const holeGlow = ctx.createRadialGradient(noseX, noseY, 5, noseX, noseY, targetNostril.radius + 15);
+            holeGlow.addColorStop(0, '#000000');
+            holeGlow.addColorStop(0.7, '#4c0519'); // Pinkish mucosa
+            holeGlow.addColorStop(1, '#1e293b');
+
+            ctx.fillStyle = holeGlow;
+            ctx.beginPath();
+            ctx.ellipse(noseX, noseY, targetNostril.radius + 10, targetNostril.radius, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#f43f5e';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Nose Hairs (Cilia Guard)
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 12; i++) {
+                const angle = (i / 12) * Math.PI * 2;
+                const hx = noseX + Math.cos(angle) * (targetNostril.radius - 5);
+                const hy = noseY + Math.sin(angle) * (targetNostril.radius - 5);
+                ctx.beginPath();
+                ctx.moveTo(hx, hy);
+                ctx.lineTo(hx + Math.cos(angle) * 12, hy + Math.sin(angle) * 12);
+                ctx.stroke();
+            }
+
+            // Draw Microbe Particles in Nostril
+            nostrilGerms.forEach(g => {
+                g.update(0, 0);
+                g.draw(ctx, noseX, noseY);
+            });
+
+            // If mucosal damage occurs, draw blood capillary leakage (Red micro cracks)
+            if (damageVal > 0) {
+                ctx.strokeStyle = `rgba(225, 29, 72, ${Math.min(1, damageVal / 60)})`;
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 6; i++) {
+                    const ang = (i / 6) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.moveTo(noseX, noseY);
+                    ctx.lineTo(noseX + Math.cos(ang) * (targetNostril.radius + 8), noseY + Math.sin(ang) * (targetNostril.radius + 8));
+                    ctx.stroke();
+                }
+            }
+
+            // --- 2. Distance Check (Collision Detection) ---
+            const distToNose = Math.hypot(fx - noseX, fy - noseY);
+            const isColliding = distToNose < targetNostril.radius + 20;
+
+            if (isColliding) {
+                if (!hasTouchedNose) {
+                    hasTouchedNose = true;
+                    audio.playSquish();
+                    audio.playWarning();
+                    logEvent('⚠️ 指が鼻孔粘膜に挿入されました！細菌の相互移動が開始。', 'text-rose-400');
+                    
+                    // Update UI status
+                    document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-rose-500 animate-ping";
+                    document.getElementById('statusText').innerText = "状態: 鼻孔内に挿入・感染中！";
+                }
+
+                // Increment damage & mucus contamination stats
+                if (damageVal < 100) damageVal += 0.4;
+                if (mucusVal < 100) mucusVal += 0.6;
+                currentGermCount += 8000;
+
+                updateMeters();
+
+                // Draw Mucus Stickiness Strings (Slime Connections)
+                ctx.strokeStyle = 'rgba(16, 185, 129, 0.7)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(noseX - 10, noseY);
+                ctx.quadraticCurveTo((noseX + fx) / 2 + Math.sin(Date.now() * 0.01) * 10, (noseY + fy) / 2, fx - 10, fy - 30);
+                ctx.moveTo(noseX + 10, noseY);
+                ctx.quadraticCurveTo((noseX + fx) / 2 - Math.sin(Date.now() * 0.01) * 10, (noseY + fy) / 2, fx + 10, fy - 30);
+                ctx.stroke();
+            }
+
+            // --- 3. Draw Finger Graphics ---
+            ctx.save();
+
+            // Finger Skin
+            const fingerGrad = ctx.createLinearGradient(fx - 25, fy, fx + 25, fy);
+            fingerGrad.addColorStop(0, '#fca5a5');
+            fingerGrad.addColorStop(1, '#f87171');
+
+            ctx.fillStyle = fingerGrad;
+            ctx.beginPath();
+            ctx.roundRect(fx - 22, fy - 40, 44, 140, [22, 22, 10, 10]);
+            ctx.fill();
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // Finger Nail
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.beginPath();
+            ctx.roundRect(fx - 14, fy - 32, 28, 22, [8, 8, 4, 4]);
+            ctx.fill();
+
+            // If contaminated, color finger tip with green mucus slime layer
+            if (mucusVal > 10) {
+                ctx.fillStyle = `rgba(16, 185, 129, ${Math.min(0.8, mucusVal / 100)})`;
+                ctx.beginPath();
+                ctx.ellipse(fx, fy - 35, 20, 15, 0, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Draw Microbe Particles on Finger
+            fingerGerms.forEach(g => {
+                g.update(0, 0);
+                g.draw(ctx, fx, fy - 20);
+            });
+
+            ctx.restore();
+
+            requestAnimationFrame(render);
+        }
+
+        // Helper: Log Events to On-screen Microscope Console
+        function logEvent(msg, colorClass = 'text-slate-300') {
+            const logBox = document.getElementById('eventLog');
+            const item = document.createElement('div');
+            item.className = colorClass;
+            item.innerText = `> ${msg}`;
+            logBox.appendChild(item);
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        // Update UI Dashboard Counters
+        function updateMeters() {
+            document.getElementById('fingerGermCount').innerText = Math.floor(currentGermCount).toLocaleString();
+            document.getElementById('mucosaDamage').innerText = `${Math.floor(damageVal)} %`;
+            document.getElementById('mucusContamination').innerText = `${Math.floor(mucusVal)} %`;
+
+            // Phase 2 Badge Update
+            const badge = document.getElementById('fingerDirtyBadge');
+            if (mucusVal > 30) {
+                badge.innerText = "⚠️ 粘液・黄色ブドウ球菌で激しく汚染！";
+                badge.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 bio-glow";
+            } else if (mucusVal > 0) {
+                badge.innerText = "⚠️ やや汚染状態";
+                badge.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40";
+            }
+        }
+
+        // Mouse / Touch Drag Input Handling
+        function handleMove(e) {
+            if (!isDragging) return;
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+            fingerPos.x = Math.max(0.1, Math.min(0.9, (clientX - rect.left) / rect.width));
+            fingerPos.y = Math.max(0.1, Math.min(0.95, (clientY - rect.top) / rect.height));
+
+            // Hide overlay hint on first drag
+            dragHint.classList.add('opacity-0', 'pointer-events-none');
+        }
+
+        canvas.addEventListener('mousedown', (e) => { isDragging = true; handleMove(e); });
+        canvas.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', () => { isDragging = false; });
+
+        canvas.addEventListener('touchstart', (e) => { isDragging = true; handleMove(e); }, { passive: true });
+        canvas.addEventListener('touchmove', handleMove, { passive: true });
+        window.addEventListener('touchend', () => { isDragging = false; });
+
+        // Reset Finger / Alcohol Disinfection Button
+        document.getElementById('resetFingerBtn').addEventListener('click', () => {
+            audio.playClean();
+            hasTouchedNose = false;
+            damageVal = 0;
+            mucusVal = 0;
+            currentGermCount = 250000;
+            fingerPos.x = 0.5;
+            fingerPos.y = 0.85;
+
+            updateMeters();
+
+            document.getElementById('statusDot').className = "w-2 h-2 rounded-full bg-emerald-400";
+            document.getElementById('statusText').innerText = "状態: アルコール消毒完了（清潔）";
+
+            const badge = document.getElementById('fingerDirtyBadge');
+            badge.innerText = "きれい（未汚染）";
+            badge.className = "text-xs font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-400 border border-slate-700";
+
+            // Reset Target Cards
+            document.querySelectorAll('.target-card .germ-overlay').forEach(el => {
+                el.classList.add('opacity-0');
+            });
+
+            logEvent('✨ 指を消毒し、清潔な状態に戻しました。', 'text-emerald-400');
+        });
+
+        // Phase 2 Interaction: Secondary Object Contamination Simulation
+        const targetCards = document.querySelectorAll('.target-card');
+        targetCards.forEach(card => {
+            card.addEventListener('click', () => {
+                const targetName = card.getAttribute('data-target');
+                const overlay = card.querySelector('.germ-overlay');
+
+                if (mucusVal < 10) {
+                    audio.playWarning();
+                    logEvent(`⚠️ 先に【1】のシミュレーターで指を鼻に入れて汚染させてから ${targetName} を触ってください！`, 'text-amber-400');
+                    return;
+                }
+
+                audio.playSquish();
+                overlay.classList.remove('opacity-0');
+                logEvent(`🦠 汚染された指で「${targetName}」を触りました！黄色ブドウ球菌と鼻汁が全面へ拡散！`, 'text-rose-400');
+            });
+        });
+
+        // Initialize Lucide Icons & Canvas Loop
+        window.onload = () => {
+            lucide.createIcons();
+            requestAnimationFrame(render);
+        };
+    </script>
+</body>
+</html>
